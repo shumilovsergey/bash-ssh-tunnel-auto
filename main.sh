@@ -1,36 +1,32 @@
 #!/bin/bash
 
-# Load environment variables from .env file
-set -a
-source .env
-set +a
+REMOTE_USER = ""
+REMOTE_HOST = ""
+REMOTE_PORT = 
+LOCAL_PORT = 
 
-check_tunnel() {
-    netstat -tn | grep ":$LOCAL_PORT" | grep -q ESTABLISHED
-}
 
 kill_remote_ports() {
-    ssh -p $REMOTE_PORT2 $REMOTE_USER@$REMOTE_HOST "
-        sudo fuser -k $REMOTE_PORT1/tcp;
-        sudo fuser -k $REMOTE_PORT2/tcp;
-    "
+    ssh $REMOTE_USER@$REMOTE_HOST '
+        pids=$(lsof -i :$REMOTE_PORT -t);
+        for pid in $pids;
+            do echo "Killing process $pid..."
+            kill $pid;
+        done;
+        exit;
+    '
 }
 
 create_tunnel() {
-    ssh -fN -L $LOCAL_PORT:localhost:$REMOTE_PORT1 $REMOTE_USER@$REMOTE_HOST
+    ssh -fN -R $LOCAL_PORT:localhost:$REMOTE_PORT $REMOTE_USER@$REMOTE_HOST
+    echo "redirect on $LOCAL_PORT is up!"
 }
 
 
 
-if check_tunnel; then
-    echo "Tunnel is up"
-else
-    echo "Tunnel is down. Restarting..."
-    kill_remote_ports
-    create_tunnel
-    if check_tunnel; then
-        echo "Tunnel successfully created"
-    else
-        echo "Failed to create tunnel"
-    fi
-fi
+kill_remote_ports
+create_tunnel
+
+#    crontab -e
+#    */5 * * * * /path/to/script/auto-ssh-script.sh
+
